@@ -85,7 +85,7 @@ export default function App() {
   const uploadImageToSupabase = async (file) => {
     if (!file) return '';
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36.substring(2))}.${fileExt}`;
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
     const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabase.storage.from('perfume-media').upload(filePath, file);
@@ -130,7 +130,6 @@ export default function App() {
       alert(error.message);
     } else {
       setShowAddModal(false);
-      // Reset form
       setNewName(''); setNewBrand(''); setNewReleaseYear(''); setNewIsDupe(false); setNewDupeOf('');
       setNewTopNotes(''); setNewMiddleNotes(''); setNewBaseNotes('');
       setBottleFile(null); setBoxFile(null);
@@ -154,7 +153,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-zinc-100 p-6 md:p-10 font-sans">
-      {/* Editorial Luxury Header */}
       <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-6 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center font-bold text-black text-sm">PV</div>
@@ -178,7 +176,6 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto space-y-12">
-        {/* Hero Section */}
         <section className="py-6 border-b border-white/5">
           <p className="text-amber-400 text-xs tracking-widest uppercase mb-2 font-medium">Curated Fragrance Collection</p>
           <h2 className="text-4xl md:text-5xl font-serif text-white max-w-2xl leading-tight">
@@ -186,7 +183,6 @@ export default function App() {
           </h2>
         </section>
 
-        {/* Daily 10 Spotlight */}
         {dailySpotlight.length > 0 && (
           <section>
             <div className="flex justify-between items-end mb-6">
@@ -215,7 +211,6 @@ export default function App() {
           </section>
         )}
 
-        {/* Filter Controls Bar */}
         <section className="bg-[#121212] p-6 rounded-2xl border border-white/5 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input 
@@ -258,7 +253,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* Collection Grid */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredPerfumes.map(p => (
             <PerfumeCard key={p.id} perfume={p} isAdmin={!!user} onUpdate={fetchPerfumes} />
@@ -266,7 +260,6 @@ export default function App() {
         </section>
       </main>
 
-      {/* Login Modal */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <form onSubmit={handleLogin} className="bg-[#121212] p-8 rounded-2xl border border-white/10 w-full max-w-sm space-y-5">
@@ -281,7 +274,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Add New Perfume Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <form onSubmit={handleCreatePerfume} className="bg-[#121212] p-8 rounded-2xl border border-white/10 w-full max-w-xl space-y-4 my-8">
