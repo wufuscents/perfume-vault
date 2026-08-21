@@ -6,11 +6,30 @@ export default function App() {
   const [dailySpotlight, setDailySpotlight] = useState([]);
   const [user, setUser] = useState(null);
   
-  // Login Form
+  // Login & Add Perfume Modals
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
+  // New Perfume Form State
+  const [newName, setNewName] = useState('');
+  const [newBrand, setNewBrand] = useState('');
+  const [newReleaseYear, setNewReleaseYear] = useState('');
+  const [newIsDupe, setNewIsDupe] = useState(false);
+  const [newDupeOf, setNewDupeOf] = useState('');
+  const [newTopNotes, setNewTopNotes] = useState('');
+  const [newMiddleNotes, setNewMiddleNotes] = useState('');
+  const [newBaseNotes, setNewBaseNotes] = useState('');
+  const [newScent, setNewScent] = useState('4.0');
+  const [newPerf, setNewPerf] = useState('4.0');
+  const [newPrice, setNewPrice] = useState('4.0');
+  const [newPres, setNewPres] = useState('4.0');
+  const [newOverall, setNewOverall] = useState('4.0');
+  const [bottleFile, setBottleFile] = useState(null);
+  const [boxFile, setBoxFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
   // Search & Filters
   const [search, setSearch] = useState('');
   const [selectedNote, setSelectedNote] = useState('');
@@ -62,6 +81,63 @@ export default function App() {
 
   const handleLogout = () => supabase.auth.signOut();
 
+  // Helper to upload images to Supabase Storage bucket 'perfume-media'
+  const uploadImageToSupabase = async (file) => {
+    if (!file) return '';
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36.substring(2))}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage.from('perfume-media').upload(filePath, file);
+    if (uploadError) {
+      alert(uploadError.message);
+      return '';
+    }
+
+    const { data } = supabase.storage.from('perfume-media').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleCreatePerfume = async (e) => {
+    e.preventDefault();
+    setUploading(true);
+
+    const bottleUrl = await uploadImageToSupabase(bottleFile);
+    const boxUrl = await uploadImageToSupabase(boxFile);
+
+    const topArray = newTopNotes.split(',').map(n => n.trim()).filter(Boolean);
+    const middleArray = newMiddleNotes.split(',').map(n => n.trim()).filter(Boolean);
+    const baseArray = newBaseNotes.split(',').map(n => n.trim()).filter(Boolean);
+
+    const { error } = await supabase.from('perfumes').insert([{
+      name: newName,
+      brand: newBrand,
+      release_year: parseInt(newReleaseYear) || null,
+      is_dupe: newIsDupe,
+      dupe_of: newDupeOf,
+      bottle_image_url: bottleUrl,
+      box_image_url: boxUrl,
+      notes: { top: topArray, middle: middleArray, base: baseArray },
+      rating_scent: parseFloat(newScent),
+      rating_performance: parseFloat(newPerf),
+      rating_price: parseFloat(newPrice),
+      rating_presentation: parseFloat(newPres),
+      rating_overall: parseFloat(newOverall)
+    }]);
+
+    setUploading(false);
+    if (error) {
+      alert(error.message);
+    } else {
+      setShowAddModal(false);
+      // Reset form
+      setNewName(''); setNewBrand(''); setNewReleaseYear(''); setNewIsDupe(false); setNewDupeOf('');
+      setNewTopNotes(''); setNewMiddleNotes(''); setNewBaseNotes('');
+      setBottleFile(null); setBoxFile(null);
+      fetchPerfumes();
+    }
+  };
+
   const filteredPerfumes = perfumes.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
                           p.brand.toLowerCase().includes(search.toLowerCase());
@@ -84,10 +160,13 @@ export default function App() {
           <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center font-bold text-black text-sm">PV</div>
           <h1 className="text-2xl font-serif tracking-widest text-white uppercase">Perfume<span className="text-amber-400 font-sans font-bold">Vault</span></h1>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
           {user ? (
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full bg-amber-400/5">Admin Active</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowAddModal(true)} className="bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full transition shadow-lg shadow-amber-400/10">
+                + Add Perfume
+              </button>
+              <span className="text-xs text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full bg-amber-400/5 hidden sm:inline-block">Admin Active</span>
               <button onClick={handleLogout} className="bg-zinc-900 hover:bg-zinc-800 text-xs px-4 py-2 rounded-full border border-white/10 transition">Logout</button>
             </div>
           ) : (
@@ -197,6 +276,80 @@ export default function App() {
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowLoginModal(false)} className="px-4 py-2 rounded-full text-xs text-zinc-400">Cancel</button>
               <button type="submit" className="bg-amber-400 text-black font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wider">Login</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Add New Perfume Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <form onSubmit={handleCreatePerfume} className="bg-[#121212] p-8 rounded-2xl border border-white/10 w-full max-w-xl space-y-4 my-8">
+            <h3 className="text-xl font-serif text-amber-400">Add New Perfume</h3>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <input type="text" placeholder="Perfume Name" value={newName} onChange={e => setNewName(e.target.value)} required className="bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
+              <input type="text" placeholder="Brand" value={newBrand} onChange={e => setNewBrand(e.target.value)} required className="bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <input type="number" placeholder="Release Year (e.g. 2023)" value={newReleaseYear} onChange={e => setNewReleaseYear(e.target.value)} className="bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
+              <div className="flex items-center gap-3 bg-[#1A1A1A] px-3 rounded-xl border border-white/10">
+                <input type="checkbox" id="dupeCheck" checked={newIsDupe} onChange={e => setNewIsDupe(e.target.checked)} className="accent-amber-400" />
+                <label htmlFor="dupeCheck" className="text-xs text-zinc-300">Is this a Dupe?</label>
+              </div>
+            </div>
+
+            {newIsDupe && (
+              <input type="text" placeholder="Dupe of (e.g. Creed Aventus)" value={newDupeOf} onChange={e => setNewDupeOf(e.target.value)} className="w-full bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
+            )}
+
+            <div className="space-y-2 text-xs">
+              <label className="text-zinc-400">Fragrance Notes (comma separated)</label>
+              <input type="text" placeholder="Top Notes (e.g. Lemon, Bergamot)" value={newTopNotes} onChange={e => setNewTopNotes(e.target.value)} className="w-full bg-[#1A1A1A] p-2.5 rounded-xl border border-white/10 text-white" />
+              <input type="text" placeholder="Middle Notes (e.g. Jasmine, Rose)" value={newMiddleNotes} onChange={e => setNewMiddleNotes(e.target.value)} className="w-full bg-[#1A1A1A] p-2.5 rounded-xl border border-white/10 text-white" />
+              <input type="text" placeholder="Base Notes (e.g. Amber, Musk, Vanilla)" value={newBaseNotes} onChange={e => setNewBaseNotes(e.target.value)} className="w-full bg-[#1A1A1A] p-2.5 rounded-xl border border-white/10 text-white" />
+            </div>
+
+            <div className="grid grid-cols-5 gap-2 text-xs">
+              <div>
+                <label className="text-zinc-400 block mb-1">Scent</label>
+                <input type="number" step="0.5" min="0" max="5" value={newScent} onChange={e => setNewScent(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
+              </div>
+              <div>
+                <label className="text-zinc-400 block mb-1">Perf</label>
+                <input type="number" step="0.5" min="0" max="5" value={newPerf} onChange={e => setNewPerf(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
+              </div>
+              <div>
+                <label className="text-zinc-400 block mb-1">Price</label>
+                <input type="number" step="0.5" min="0" max="5" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
+              </div>
+              <div>
+                <label className="text-zinc-400 block mb-1">Pres</label>
+                <input type="number" step="0.5" min="0" max="5" value={newPres} onChange={e => setNewPres(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
+              </div>
+              <div>
+                <label className="text-zinc-400 block mb-1">Overall</label>
+                <input type="number" step="0.5" min="0" max="5" value={newOverall} onChange={e => setNewOverall(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs pt-2">
+              <div>
+                <label className="text-zinc-400 block mb-1">Bottle Image File</label>
+                <input type="file" accept="image/*" onChange={e => setBottleFile(e.target.files[0])} className="w-full text-zinc-400 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-400 file:text-black hover:file:bg-amber-300" />
+              </div>
+              <div>
+                <label className="text-zinc-400 block mb-1">Box Image File (Optional)</label>
+                <input type="file" accept="image/*" onChange={e => setBoxFile(e.target.files[0])} className="w-full text-zinc-400 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700" />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+              <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-full text-xs text-zinc-400">Cancel</button>
+              <button type="submit" disabled={uploading} className="bg-amber-400 text-black font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wider disabled:opacity-50">
+                {uploading ? 'Uploading & Saving...' : 'Save Perfume'}
+              </button>
             </div>
           </form>
         </div>
