@@ -20,7 +20,6 @@ export default function App() {
   const [minPresentation, setMinPresentation] = useState(0);
   const [minOverall, setMinOverall] = useState(0);
 
-  // Fetch Data & Auth State
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -40,7 +39,6 @@ export default function App() {
     else {
       setPerfumes(data || []);
       
-      // Deterministic Daily 10 Selection based on current date
       if (data && data.length > 0) {
         const todayStr = new Date().toISOString().slice(0, 10);
         let seed = 0;
@@ -64,7 +62,6 @@ export default function App() {
 
   const handleLogout = () => supabase.auth.signOut();
 
-  // Filter Logic
   const filteredPerfumes = perfumes.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
                           p.brand.toLowerCase().includes(search.toLowerCase());
@@ -80,91 +77,110 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Header */}
-      <header className="max-w-7xl mx-auto flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
-        <h1 className="text-3xl font-extrabold tracking-tight text-amber-400">Perfume Vault</h1>
+    <div className="min-h-screen bg-[#0A0A0A] text-zinc-100 p-6 md:p-10 font-sans">
+      {/* Editorial Luxury Header */}
+      <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-6 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center font-bold text-black text-sm">PV</div>
+          <h1 className="text-2xl font-serif tracking-widest text-white uppercase">Perfume<span className="text-amber-400 font-sans font-bold">Vault</span></h1>
+        </div>
         <div>
           {user ? (
             <div className="flex items-center gap-4">
-              <span className="text-sm text-slate-400">Admin Mode Active</span>
-              <button onClick={handleLogout} className="bg-slate-800 hover:bg-slate-700 text-sm px-3 py-1.5 rounded-lg">Logout</button>
+              <span className="text-xs text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full bg-amber-400/5">Admin Active</span>
+              <button onClick={handleLogout} className="bg-zinc-900 hover:bg-zinc-800 text-xs px-4 py-2 rounded-full border border-white/10 transition">Logout</button>
             </div>
           ) : (
-            <button onClick={() => setShowLoginModal(true)} className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-sm font-semibold px-4 py-2 rounded-lg">
+            <button onClick={() => setShowLoginModal(true)} className="bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-full transition shadow-lg shadow-amber-400/10">
               Admin Login
             </button>
           )}
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto space-y-10">
+      <main className="max-w-7xl mx-auto space-y-12">
+        {/* Hero Section */}
+        <section className="py-6 border-b border-white/5">
+          <p className="text-amber-400 text-xs tracking-widest uppercase mb-2 font-medium">Curated Fragrance Collection</p>
+          <h2 className="text-4xl md:text-5xl font-serif text-white max-w-2xl leading-tight">
+            Sculpting Scents in a Bottle. The Art of Perfumery.
+          </h2>
+        </section>
+
         {/* Daily 10 Spotlight */}
         {dailySpotlight.length > 0 && (
           <section>
-            <h2 className="text-lg font-bold mb-4 text-amber-300 flex items-center gap-2">
-              ✨ Daily 10 Spotlight <span className="text-xs font-normal text-slate-400">(Rotates daily)</span>
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="flex justify-between items-end mb-6">
+              <div>
+                <h3 className="text-2xl font-serif text-white">Daily Spotlight</h3>
+                <p className="text-xs text-zinc-500">Curated selections rotated every 24 hours</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {dailySpotlight.map(p => (
-                <div key={p.id} className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex flex-col justify-between">
-                  <img src={p.bottle_image_url} alt={p.name} className="h-28 object-contain w-full mb-2" />
-                  <div>
-                    <h3 className="font-bold text-xs truncate">{p.name}</h3>
-                    <p className="text-[10px] text-slate-400">{p.brand}</p>
+                <div key={p.id} className="bg-[#121212] p-4 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-400/30 transition group">
+                  <div className="h-32 bg-[#1A1A1A] rounded-xl p-2 mb-3 flex items-center justify-center">
+                    <img src={p.bottle_image_url} alt={p.name} className="h-full object-contain group-hover:scale-105 transition duration-300" />
                   </div>
-                  <div className="mt-2 text-xs text-amber-400 font-semibold">★ {p.rating_overall}</div>
+                  <div>
+                    <h4 className="font-medium text-xs text-white truncate">{p.name}</h4>
+                    <p className="text-[10px] text-zinc-500">{p.brand}</p>
+                  </div>
+                  <div className="mt-3 flex justify-between items-center text-xs pt-2 border-t border-white/5">
+                    <span className="text-amber-400 font-bold">★ {p.rating_overall}</span>
+                    <span className="text-[10px] bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded-full">Spotlight</span>
+                  </div>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Filter Bar */}
-        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+        {/* Filter Controls Bar */}
+        <section className="bg-[#121212] p-6 rounded-2xl border border-white/5 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input 
               type="text" 
-              placeholder="Search perfume or brand..." 
+              placeholder="Search by perfume name or brand..." 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              className="bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
             />
             <input 
               type="text" 
-              placeholder="Filter by note (e.g. Vanilla, Oud)..." 
+              placeholder="Filter by note (e.g. Amber, Vanilla, Bergamot)..." 
               value={selectedNote} 
               onChange={e => setSelectedNote(e.target.value)} 
-              className="bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-white/5 text-xs">
             <div>
-              <label className="text-slate-400 block mb-1">Min Scent: {minScent}★</label>
+              <label className="text-zinc-400 block mb-1">Min Scent: <span className="text-amber-400 font-bold">{minScent}★</span></label>
               <input type="range" min="0" max="5" step="0.5" value={minScent} onChange={e => setMinScent(parseFloat(e.target.value))} className="w-full accent-amber-400" />
             </div>
             <div>
-              <label className="text-slate-400 block mb-1">Min Performance: {minPerformance}★</label>
+              <label className="text-zinc-400 block mb-1">Min Performance: <span className="text-amber-400 font-bold">{minPerformance}★</span></label>
               <input type="range" min="0" max="5" step="0.5" value={minPerformance} onChange={e => setMinPerformance(parseFloat(e.target.value))} className="w-full accent-amber-400" />
             </div>
             <div>
-              <label className="text-slate-400 block mb-1">Min Price: {minPrice}★</label>
+              <label className="text-zinc-400 block mb-1">Min Price: <span className="text-amber-400 font-bold">{minPrice}★</span></label>
               <input type="range" min="0" max="5" step="0.5" value={minPrice} onChange={e => setMinPrice(parseFloat(e.target.value))} className="w-full accent-amber-400" />
             </div>
             <div>
-              <label className="text-slate-400 block mb-1">Min Presentation: {minPresentation}★</label>
+              <label className="text-zinc-400 block mb-1">Min Presentation: <span className="text-amber-400 font-bold">{minPresentation}★</span></label>
               <input type="range" min="0" max="5" step="0.5" value={minPresentation} onChange={e => setMinPresentation(parseFloat(e.target.value))} className="w-full accent-amber-400" />
             </div>
             <div>
-              <label className="text-slate-400 block mb-1">Min Overall: {minOverall}★</label>
+              <label className="text-zinc-400 block mb-1">Min Overall: <span className="text-amber-400 font-bold">{minOverall}★</span></label>
               <input type="range" min="0" max="5" step="0.5" value={minOverall} onChange={e => setMinOverall(parseFloat(e.target.value))} className="w-full accent-amber-400" />
             </div>
           </div>
         </section>
 
         {/* Collection Grid */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredPerfumes.map(p => (
             <PerfumeCard key={p.id} perfume={p} isAdmin={!!user} onUpdate={fetchPerfumes} />
           ))}
@@ -173,14 +189,14 @@ export default function App() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4">
-          <form onSubmit={handleLogin} className="bg-slate-900 p-6 rounded-2xl border border-slate-800 w-full max-w-sm space-y-4">
-            <h3 className="text-lg font-bold text-amber-400">Admin Sign In</h3>
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-sm" />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-sm" />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowLoginModal(false)} className="px-3 py-1.5 rounded text-sm text-slate-400">Cancel</button>
-              <button type="submit" className="bg-amber-500 text-slate-950 font-semibold px-4 py-1.5 rounded-lg text-sm">Login</button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleLogin} className="bg-[#121212] p-8 rounded-2xl border border-white/10 w-full max-w-sm space-y-5">
+            <h3 className="text-xl font-serif text-white">Admin Access</h3>
+            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowLoginModal(false)} className="px-4 py-2 rounded-full text-xs text-zinc-400">Cancel</button>
+              <button type="submit" className="bg-amber-400 text-black font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wider">Login</button>
             </div>
           </form>
         </div>
@@ -214,63 +230,63 @@ function PerfumeCard({ perfume, isAdmin, onUpdate }) {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between relative shadow-xl">
+    <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 flex flex-col justify-between relative shadow-2xl hover:border-amber-400/20 transition group">
       {isAdmin && (
-        <button onClick={() => setIsEditing(!isEditing)} className="absolute top-4 right-4 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-1 rounded-lg">
+        <button onClick={() => setIsEditing(!isEditing)} className="absolute top-4 right-4 text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full z-10">
           {isEditing ? 'Cancel' : '✏️ Edit Links'}
         </button>
       )}
 
       <div>
-        <div className="flex gap-2 h-44 bg-slate-950 p-2 rounded-xl mb-4 justify-center items-center">
-          <img src={perfume.bottle_image_url} alt={perfume.name} className="h-full object-contain max-w-[50%]" />
-          {perfume.box_image_url && <img src={perfume.box_image_url} alt="Box" className="h-full object-contain max-w-[50%]" />}
+        <div className="flex gap-3 h-52 bg-[#1A1A1A] p-4 rounded-xl mb-5 justify-center items-center relative overflow-hidden">
+          <img src={perfume.bottle_image_url} alt={perfume.name} className="h-full object-contain max-w-[50%] group-hover:scale-105 transition duration-500" />
+          {perfume.box_image_url && <img src={perfume.box_image_url} alt="Box" className="h-full object-contain max-w-[50%] group-hover:scale-105 transition duration-500" />}
         </div>
 
-        <h3 className="font-bold text-lg">{perfume.name}</h3>
-        <p className="text-xs text-slate-400 mb-2">{perfume.brand} • Released {perfume.release_year}</p>
+        <h3 className="font-serif text-xl text-white mb-1">{perfume.name}</h3>
+        <p className="text-xs text-zinc-500 mb-3">{perfume.brand} • Released {perfume.release_year}</p>
 
         {perfume.is_dupe && (
-          <div className="bg-amber-950/50 border border-amber-800/50 text-amber-300 text-xs px-2.5 py-1 rounded-md mb-3 inline-block">
+          <div className="bg-amber-400/10 border border-amber-400/20 text-amber-300 text-[11px] px-3 py-1 rounded-full mb-4 inline-block">
             🔍 Dupe of: <span className="font-semibold">{perfume.dupe_of}</span>
           </div>
         )}
 
-        <div className="space-y-1 text-xs bg-slate-950/60 p-3 rounded-xl mb-4 border border-slate-800">
-          <p><span className="text-amber-400 font-medium">Top:</span> {perfume.notes?.top?.join(', ')}</p>
-          <p><span className="text-amber-400 font-medium">Middle:</span> {perfume.notes?.middle?.join(', ')}</p>
-          <p><span className="text-amber-400 font-medium">Base:</span> {perfume.notes?.base?.join(', ')}</p>
+        <div className="space-y-1.5 text-xs bg-[#1A1A1A] p-4 rounded-xl mb-5 border border-white/5 text-zinc-300">
+          <p><span className="text-amber-400 font-semibold">Top:</span> {perfume.notes?.top?.join(', ')}</p>
+          <p><span className="text-amber-400 font-semibold">Middle:</span> {perfume.notes?.middle?.join(', ')}</p>
+          <p><span className="text-amber-400 font-semibold">Base:</span> {perfume.notes?.base?.join(', ')}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-          <div className="bg-slate-950 p-2 rounded-lg">Scent: <span className="font-bold text-amber-400">{perfume.rating_scent}★</span></div>
-          <div className="bg-slate-950 p-2 rounded-lg">Performance: <span className="font-bold text-amber-400">{perfume.rating_performance}★</span></div>
-          <div className="bg-slate-950 p-2 rounded-lg">Price: <span className="font-bold text-amber-400">{perfume.rating_price}★</span></div>
-          <div className="bg-slate-950 p-2 rounded-lg">Presentation: <span className="font-bold text-amber-400">{perfume.rating_presentation}★</span></div>
+        <div className="grid grid-cols-2 gap-2 text-xs mb-3 text-zinc-300">
+          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Scent: <span className="font-bold text-amber-400">{perfume.rating_scent}★</span></div>
+          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Perf: <span className="font-bold text-amber-400">{perfume.rating_performance}★</span></div>
+          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Price: <span className="font-bold text-amber-400">{perfume.rating_price}★</span></div>
+          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Pres: <span className="font-bold text-amber-400">{perfume.rating_presentation}★</span></div>
         </div>
-        <div className="bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg text-center font-bold text-amber-400 text-sm mb-4">
+        <div className="bg-amber-400/10 border border-amber-400/30 p-2.5 rounded-xl text-center font-bold text-amber-400 text-sm mb-5">
           Overall: {perfume.rating_overall} / 5.0 ★
         </div>
       </div>
 
       {isEditing ? (
-        <div className="bg-slate-950 p-3 rounded-xl space-y-2 text-xs border border-amber-500/40">
-          <input type="text" placeholder="Shopee URL" value={shopee} onChange={e => setShopee(e.target.value)} className="w-full bg-slate-900 p-1.5 rounded border border-slate-800" />
-          <input type="text" placeholder="Tokopedia URL" value={tokopedia} onChange={e => setTokopedia(e.target.value)} className="w-full bg-slate-900 p-1.5 rounded border border-slate-800" />
-          <input type="text" placeholder="TikTok Shop URL" value={tiktokShop} onChange={e => setTiktokShop(e.target.value)} className="w-full bg-slate-900 p-1.5 rounded border border-slate-800" />
-          <input type="text" placeholder="YouTube Review URL" value={yt} onChange={e => setYt(e.target.value)} className="w-full bg-slate-900 p-1.5 rounded border border-slate-800" />
-          <input type="text" placeholder="TikTok Review URL" value={tt} onChange={e => setTt(e.target.value)} className="w-full bg-slate-900 p-1.5 rounded border border-slate-800" />
-          <button onClick={saveChanges} className="w-full bg-amber-500 text-slate-950 font-bold py-1.5 rounded mt-2">Save to Supabase</button>
+        <div className="bg-[#1A1A1A] p-4 rounded-xl space-y-2 text-xs border border-amber-400/30">
+          <input type="text" placeholder="Shopee URL" value={shopee} onChange={e => setShopee(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
+          <input type="text" placeholder="Tokopedia URL" value={tokopedia} onChange={e => setTokopedia(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
+          <input type="text" placeholder="TikTok Shop URL" value={tiktokShop} onChange={e => setTiktokShop(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
+          <input type="text" placeholder="YouTube Review URL" value={yt} onChange={e => setYt(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
+          <input type="text" placeholder="TikTok Review URL" value={tt} onChange={e => setTt(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
+          <button onClick={saveChanges} className="w-full bg-amber-400 text-black font-bold py-2 rounded-lg mt-2 uppercase tracking-wider text-[11px]">Save Changes</button>
         </div>
       ) : (
-        <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
-          <div className="flex flex-wrap gap-1.5">
-            {perfume.link_shopee && <a href={perfume.link_shopee} target="_blank" rel="noreferrer" className="bg-orange-600/80 text-white px-2.5 py-1 rounded-md text-[11px]">Shopee</a>}
-            {perfume.link_tokopedia && <a href={perfume.link_tokopedia} target="_blank" rel="noreferrer" className="bg-emerald-600/80 text-white px-2.5 py-1 rounded-md text-[11px]">Tokopedia</a>}
-            {perfume.link_tiktok_shop && <a href={perfume.link_tiktok_shop} target="_blank" rel="noreferrer" className="bg-slate-800 text-white px-2.5 py-1 rounded-md text-[11px]">TikTok Shop</a>}
-            {perfume.link_fragrantica && <a href={perfume.link_fragrantica} target="_blank" rel="noreferrer" className="bg-blue-900/60 text-blue-300 border border-blue-800 px-2.5 py-1 rounded-md text-[11px]">Fragrantica</a>}
+        <div className="space-y-3 pt-3 border-t border-white/5 text-xs">
+          <div className="flex flex-wrap gap-2">
+            {perfume.link_shopee && <a href={perfume.link_shopee} target="_blank" rel="noreferrer" className="bg-amber-400 text-black font-bold px-3 py-1 rounded-full text-[11px] hover:bg-amber-300 transition">Shopee</a>}
+            {perfume.link_tokopedia && <a href={perfume.link_tokopedia} target="_blank" rel="noreferrer" className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px]">Tokopedia</a>}
+            {perfume.link_tiktok_shop && <a href={perfume.link_tiktok_shop} target="_blank" rel="noreferrer" className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-[11px]">TikTok Shop</a>}
+            {perfume.link_fragrantica && <a href={perfume.link_fragrantica} target="_blank" rel="noreferrer" className="bg-zinc-900 text-zinc-400 border border-white/10 px-3 py-1 rounded-full text-[11px]">Fragrantica</a>}
           </div>
-          <div className="flex gap-3 text-[11px] pt-1">
+          <div className="flex gap-4 text-[11px] pt-1">
             {perfume.video_youtube && <a href={perfume.video_youtube} target="_blank" rel="noreferrer" className="text-red-400 hover:underline">▶ YouTube Review</a>}
             {perfume.video_tiktok && <a href={perfume.video_tiktok} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">🎵 TikTok Review</a>}
           </div>
