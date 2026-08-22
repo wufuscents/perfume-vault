@@ -3,440 +3,261 @@ import { supabase } from './supabaseClient';
 
 export default function App() {
   const [perfumes, setPerfumes] = useState([]);
-  const [dailySpotlight, setDailySpotlight] = useState([]);
-  const [user, setUser] = useState(null);
-  
-  // Login & Add Perfume Modals
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  // New Perfume Form State
-  const [newName, setNewName] = useState('');
-  const [newBrand, setNewBrand] = useState('');
-  const [newReleaseYear, setNewReleaseYear] = useState('');
-  const [newIsDupe, setNewIsDupe] = useState(false);
-  const [newDupeOf, setNewDupeOf] = useState('');
-  const [newTopNotes, setNewTopNotes] = useState('');
-  const [newMiddleNotes, setNewMiddleNotes] = useState('');
-  const [newBaseNotes, setNewBaseNotes] = useState('');
-  const [newScent, setNewScent] = useState('4.0');
-  const [newPerf, setNewPerf] = useState('4.0');
-  const [newPrice, setNewPrice] = useState('4.0');
-  const [newPres, setNewPres] = useState('4.0');
-  const [newOverall, setNewOverall] = useState('4.0');
-  const [bottleFile, setBottleFile] = useState(null);
-  const [boxFile, setBoxFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-
-  // Search & Filters
-  const [search, setSearch] = useState('');
-  const [selectedNote, setSelectedNote] = useState('');
+  const [selectedPerfume, setSelectedPerfume] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [noteFilter, setNoteFilter] = useState('');
   const [minScent, setMinScent] = useState(0);
-  const [minPerformance, setMinPerformance] = useState(0);
+  const [minPerf, setMinPerf] = useState(0);
   const [minPrice, setMinPrice] = useState(0);
-  const [minPresentation, setMinPresentation] = useState(0);
+  const [minPres, setMinPres] = useState(0);
   const [minOverall, setMinOverall] = useState(0);
 
+  // Admin Auth States
+  const [user, setUser] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Form States
+  const [name, setName] = useState('');
+  const [house, setHouse] = useState('');
+  const [releaseYear, setReleaseYear] = useState('');
+  const [isDupe, setIsDupe] = useState(false);
+  const [dupeNotes, setDupeNotes] = useState('');
+  const [topNotes, setTopNotes] = useState('');
+  const [middleNotes, setMiddleNotes] = useState('');
+  const [baseNotes, setBaseNotes] = useState('');
+  const [scent, setScent] = useState(5);
+  const [performance, setPerformance] = useState(5);
+  const [price, setPrice] = useState(5);
+  const [presentation, setPresentation] = useState(5);
+  const [overall, setOverall] = useState(5);
+  const [shopeeLink, setShopeeLink] = useState('');
+  const [tokopediaLink, setTokopediaLink] = useState('');
+  const [bottleFile, setBottleFile] = useState(null);
+  const [boxFile, setBoxFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
+    fetchPerfumes();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
-
-    fetchPerfumes();
-    return () => authListener.subscription.unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
-  async function fetchPerfumes() {
+  const fetchPerfumes = async () => {
     const { data, error } = await supabase.from('perfumes').select('*').order('created_at', { ascending: false });
-    if (error) console.error('Error fetching perfumes:', error);
-    else {
-      setPerfumes(data || []);
-      
-      if (data && data.length > 0) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        let seed = 0;
-        for (let i = 0; i < todayStr.length; i++) seed += todayStr.charCodeAt(i);
-        const shuffled = [...data].sort((a, b) => ((a.id.charCodeAt(0) * seed) % 10) - ((b.id.charCodeAt(0) * seed) % 10));
-        setDailySpotlight(shuffled.slice(0, 10));
-      }
-    }
-  }
+    if (!error && data) setPerfumes(data);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) alert(error.message);
-    else {
-      setShowLoginModal(false);
-      setEmail('');
-      setPassword('');
-    }
+    else setShowLoginModal(false);
   };
 
-  const handleLogout = () => supabase.auth.signOut();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
-  // Helper to upload images to Supabase Storage bucket 'perfume-media'
   const uploadImageToSupabase = async (file) => {
     if (!file) return '';
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage.from('perfume-media').upload(filePath, file);
+    const { error: uploadError } = await supabase.storage.from('perfume-media').upload(fileName, file);
     if (uploadError) {
       alert(uploadError.message);
       return '';
     }
-
-    const { data } = supabase.storage.from('perfume-media').getPublicUrl(filePath);
+    const { data } = supabase.storage.from('perfume-media').getPublicUrl(fileName);
     return data.publicUrl;
   };
 
-  const handleCreatePerfume = async (e) => {
+  const handleAddPerfume = async (e) => {
     e.preventDefault();
-    setUploading(true);
-
+    setLoading(true);
     const bottleUrl = await uploadImageToSupabase(bottleFile);
     const boxUrl = await uploadImageToSupabase(boxFile);
 
-    const topArray = newTopNotes.split(',').map(n => n.trim()).filter(Boolean);
-    const middleArray = newMiddleNotes.split(',').map(n => n.trim()).filter(Boolean);
-    const baseArray = newBaseNotes.split(',').map(n => n.trim()).filter(Boolean);
-
     const { error } = await supabase.from('perfumes').insert([{
-      name: newName,
-      brand: newBrand,
-      release_year: parseInt(newReleaseYear) || null,
-      is_dupe: newIsDupe,
-      dupe_of: newDupeOf,
-      bottle_image_url: bottleUrl,
-      box_image_url: boxUrl,
-      notes: { top: topArray, middle: middleArray, base: baseArray },
-      rating_scent: parseFloat(newScent),
-      rating_performance: parseFloat(newPerf),
-      rating_price: parseFloat(newPrice),
-      rating_presentation: parseFloat(newPres),
-      rating_overall: parseFloat(newOverall)
+      name, house, release_year: releaseYear, is_dupe: isDupe, dupe_notes: dupeNotes,
+      top_notes: topNotes, middle_notes: middleNotes, base_notes: baseNotes,
+      scent_rating: scent, perf_rating: performance, price_rating: price,
+      pres_rating: presentation, overall_rating: overall, shopee_link: shopeeLink,
+      tokopedia_link: tokopediaLink, bottle_url: bottleUrl, box_url: boxUrl
     }]);
 
-    setUploading(false);
-    if (error) {
-      alert(error.message);
-    } else {
+    setLoading(false);
+    if (error) alert(error.message);
+    else {
       setShowAddModal(false);
-      setNewName(''); setNewBrand(''); setNewReleaseYear(''); setNewIsDupe(false); setNewDupeOf('');
-      setNewTopNotes(''); setNewMiddleNotes(''); setNewBaseNotes('');
-      setBottleFile(null); setBoxFile(null);
       fetchPerfumes();
     }
   };
 
   const filteredPerfumes = perfumes.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
-                          p.brand.toLowerCase().includes(search.toLowerCase());
-    const allNotes = [...(p.notes?.top || []), ...(p.notes?.middle || []), ...(p.notes?.base || [])];
-    const matchesNote = selectedNote ? allNotes.some(n => n.toLowerCase().includes(selectedNote.toLowerCase())) : true;
-
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.house.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesNote = !noteFilter || `${p.top_notes} ${p.middle_notes} ${p.base_notes}`.toLowerCase().includes(noteFilter.toLowerCase());
     return matchesSearch && matchesNote &&
-           (p.rating_scent >= minScent) &&
-           (p.rating_performance >= minPerformance) &&
-           (p.rating_price >= minPrice) &&
-           (p.rating_presentation >= minPresentation) &&
-           (p.rating_overall >= minOverall);
+      p.scent_rating >= minScent && p.perf_rating >= minPerf &&
+      p.price_rating >= minPrice && p.pres_rating >= minPres &&
+      p.overall_rating >= minOverall;
   });
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-zinc-100 p-6 md:p-10 font-sans">
-      <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center font-bold text-black text-sm">PV</div>
-          <h1 className="text-2xl font-serif tracking-widest text-white uppercase">Perfume<span className="text-amber-400 font-sans font-bold">Vault</span></h1>
-        </div>
-        <div className="flex items-center gap-3">
+    <div style={{ backgroundColor: '#0c0c0c', color: '#f5f5f5', minHeight: '100vh', fontFamily: 'sans-serif', padding: '20px' }}>
+      
+      {/* HEADER */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #222', paddingBottom: '15px' }}>
+        <h1 style={{ fontFamily: 'serif', color: '#d4af37', margin: 0, letterSpacing: '2px', cursor: 'pointer' }} onClick={() => setSelectedPerfume(null)}>
+          PERFUME<span style={{ color: '#fff' }}>VAULT</span>
+        </h1>
+        <div>
           {user ? (
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowAddModal(true)} className="bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full transition shadow-lg shadow-amber-400/10">
-                + Add Perfume
-              </button>
-              <span className="text-xs text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full bg-amber-400/5 hidden sm:inline-block">Admin Active</span>
-              <button onClick={handleLogout} className="bg-zinc-900 hover:bg-zinc-800 text-xs px-4 py-2 rounded-full border border-white/10 transition">Logout</button>
-            </div>
+            <>
+              <button onClick={() => setShowAddModal(true)} style={styles.goldBtn}>+ ADD PERFUME</button>
+              <button onClick={handleLogout} style={styles.darkBtn}>Logout</button>
+            </>
           ) : (
-            <button onClick={() => setShowLoginModal(true)} className="bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-full transition shadow-lg shadow-amber-400/10">
-              Admin Login
-            </button>
+            <button onClick={() => setShowLoginModal(true)} style={styles.darkBtn}>Admin Login</button>
           )}
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto space-y-12">
-        <section className="py-6 border-b border-white/5">
-          <p className="text-amber-400 text-xs tracking-widest uppercase mb-2 font-medium">Curated Fragrance Collection</p>
-          <h2 className="text-4xl md:text-5xl font-serif text-white max-w-2xl leading-tight">
-            Sculpting Scents in a Bottle. The Art of Perfumery.
-          </h2>
-        </section>
-
-        {dailySpotlight.length > 0 && (
-          <section>
-            <div className="flex justify-between items-end mb-6">
-              <div>
-                <h3 className="text-2xl font-serif text-white">Daily Spotlight</h3>
-                <p className="text-xs text-zinc-500">Curated selections rotated every 24 hours</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {dailySpotlight.map(p => (
-                <div key={p.id} className="bg-[#121212] p-4 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-400/30 transition group">
-                  <div className="h-32 bg-[#1A1A1A] rounded-xl p-2 mb-3 flex items-center justify-center">
-                    <img src={p.bottle_image_url} alt={p.name} className="h-full object-contain group-hover:scale-105 transition duration-300" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-xs text-white truncate">{p.name}</h4>
-                    <p className="text-[10px] text-zinc-500">{p.brand}</p>
-                  </div>
-                  <div className="mt-3 flex justify-between items-center text-xs pt-2 border-t border-white/5">
-                    <span className="text-amber-400 font-bold">★ {p.rating_overall}</span>
-                    <span className="text-[10px] bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded-full">Spotlight</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="bg-[#121212] p-6 rounded-2xl border border-white/5 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input 
-              type="text" 
-              placeholder="Search by perfume name or brand..." 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-              className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
-            />
-            <input 
-              type="text" 
-              placeholder="Filter by note (e.g. Amber, Vanilla, Bergamot)..." 
-              value={selectedNote} 
-              onChange={e => setSelectedNote(e.target.value)} 
-              className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
-            />
+      {/* DETAILED VIEW (SINGLE PAGE) */}
+      {selectedPerfume ? (
+        <div style={{ maxWidth: '900px', margin: '0 auto', backgroundColor: '#141414', borderRadius: '12px', padding: '30px', border: '1px solid #282828' }}>
+          <button onClick={() => setSelectedPerfume(null)} style={{ ...styles.darkBtn, marginBottom: '20px' }}>← Back to Vault</button>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+            {selectedPerfume.bottle_url && <img src={selectedPerfume.bottle_url} alt={selectedPerfume.name} style={{ width: '100%', borderRadius: '8px', border: '1px solid #333' }} />}
+            {selectedPerfume.box_url && <img src={selectedPerfume.box_url} alt="Box" style={{ width: '100%', borderRadius: '8px', border: '1px solid #333' }} />}
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-white/5 text-xs">
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Scent: <span className="text-amber-400 font-bold">{minScent}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minScent} onChange={e => setMinScent(parseFloat(e.target.value))} className="w-full accent-amber-400" />
+          <h2 style={{ fontFamily: 'serif', color: '#fff', fontSize: '2rem', margin: '0 0 5px 0' }}>{selectedPerfume.name}</h2>
+          <p style={{ color: '#888', margin: '0 0 15px 0' }}>{selectedPerfume.house} • Released {selectedPerfume.release_year}</p>
+
+          {selectedPerfume.is_dupe && (
+            <div style={{ backgroundColor: '#222', color: '#d4af37', padding: '10px 15px', borderRadius: '6px', marginBottom: '20px', border: '1px solid #d4af37' }}>
+              🔍 <strong>Dupe Note:</strong> {selectedPerfume.dupe_notes}
             </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Performance: <span className="text-amber-400 font-bold">{minPerformance}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minPerformance} onChange={e => setMinPerformance(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Price: <span className="text-amber-400 font-bold">{minPrice}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minPrice} onChange={e => setMinPrice(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Presentation: <span className="text-amber-400 font-bold">{minPresentation}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minPresentation} onChange={e => setMinPresentation(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Overall: <span className="text-amber-400 font-bold">{minOverall}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minOverall} onChange={e => setMinOverall(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
+          )}
+
+          <div style={{ backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+            <h3 style={{ color: '#d4af37', marginTop: 0 }}>Fragrance Breakdown</h3>
+            <p><strong>Top Notes:</strong> {selectedPerfume.top_notes}</p>
+            <p><strong>Middle Notes:</strong> {selectedPerfume.middle_notes}</p>
+            <p><strong>Base Notes:</strong> {selectedPerfume.base_notes}</p>
           </div>
-        </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredPerfumes.map(p => (
-            <PerfumeCard key={p.id} perfume={p} isAdmin={!!user} onUpdate={fetchPerfumes} />
-          ))}
-        </section>
-      </main>
-
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleLogin} className="bg-[#121212] p-8 rounded-2xl border border-white/10 w-full max-w-sm space-y-5">
-            <h3 className="text-xl font-serif text-white">Admin Access</h3>
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowLoginModal(false)} className="px-4 py-2 rounded-full text-xs text-zinc-400">Cancel</button>
-              <button type="submit" className="bg-amber-400 text-black font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wider">Login</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <form onSubmit={handleCreatePerfume} className="bg-[#121212] p-8 rounded-2xl border border-white/10 w-full max-w-xl space-y-4 my-8">
-            <h3 className="text-xl font-serif text-amber-400">Add New Perfume</h3>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <input type="text" placeholder="Perfume Name" value={newName} onChange={e => setNewName(e.target.value)} required className="bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
-              <input type="text" placeholder="Brand" value={newBrand} onChange={e => setNewBrand(e.target.value)} required className="bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <input type="number" placeholder="Release Year (e.g. 2023)" value={newReleaseYear} onChange={e => setNewReleaseYear(e.target.value)} className="bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
-              <div className="flex items-center gap-3 bg-[#1A1A1A] px-3 rounded-xl border border-white/10">
-                <input type="checkbox" id="dupeCheck" checked={newIsDupe} onChange={e => setNewIsDupe(e.target.checked)} className="accent-amber-400" />
-                <label htmlFor="dupeCheck" className="text-xs text-zinc-300">Is this a Dupe?</label>
-              </div>
-            </div>
-
-            {newIsDupe && (
-              <input type="text" placeholder="Dupe of (e.g. Creed Aventus)" value={newDupeOf} onChange={e => setNewDupeOf(e.target.value)} className="w-full bg-[#1A1A1A] p-3 rounded-xl border border-white/10 text-xs text-white" />
-            )}
-
-            <div className="space-y-2 text-xs">
-              <label className="text-zinc-400">Fragrance Notes (comma separated)</label>
-              <input type="text" placeholder="Top Notes (e.g. Lemon, Bergamot)" value={newTopNotes} onChange={e => setNewTopNotes(e.target.value)} className="w-full bg-[#1A1A1A] p-2.5 rounded-xl border border-white/10 text-white" />
-              <input type="text" placeholder="Middle Notes (e.g. Jasmine, Rose)" value={newMiddleNotes} onChange={e => setNewMiddleNotes(e.target.value)} className="w-full bg-[#1A1A1A] p-2.5 rounded-xl border border-white/10 text-white" />
-              <input type="text" placeholder="Base Notes (e.g. Amber, Musk, Vanilla)" value={newBaseNotes} onChange={e => setNewBaseNotes(e.target.value)} className="w-full bg-[#1A1A1A] p-2.5 rounded-xl border border-white/10 text-white" />
-            </div>
-
-            <div className="grid grid-cols-5 gap-2 text-xs">
-              <div>
-                <label className="text-zinc-400 block mb-1">Scent</label>
-                <input type="number" step="0.5" min="0" max="5" value={newScent} onChange={e => setNewScent(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
-              </div>
-              <div>
-                <label className="text-zinc-400 block mb-1">Perf</label>
-                <input type="number" step="0.5" min="0" max="5" value={newPerf} onChange={e => setNewPerf(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
-              </div>
-              <div>
-                <label className="text-zinc-400 block mb-1">Price</label>
-                <input type="number" step="0.5" min="0" max="5" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
-              </div>
-              <div>
-                <label className="text-zinc-400 block mb-1">Pres</label>
-                <input type="number" step="0.5" min="0" max="5" value={newPres} onChange={e => setNewPres(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
-              </div>
-              <div>
-                <label className="text-zinc-400 block mb-1">Overall</label>
-                <input type="number" step="0.5" min="0" max="5" value={newOverall} onChange={e => setNewOverall(e.target.value)} className="w-full bg-[#1A1A1A] p-2 rounded-xl border border-white/10 text-white text-center" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs pt-2">
-              <div>
-                <label className="text-zinc-400 block mb-1">Bottle Image File</label>
-                <input type="file" accept="image/*" onChange={e => setBottleFile(e.target.files[0])} className="w-full text-zinc-400 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-400 file:text-black hover:file:bg-amber-300" />
-              </div>
-              <div>
-                <label className="text-zinc-400 block mb-1">Box Image File (Optional)</label>
-                <input type="file" accept="image/*" onChange={e => setBoxFile(e.target.files[0])} className="w-full text-zinc-400 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700" />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-              <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-full text-xs text-zinc-400">Cancel</button>
-              <button type="submit" disabled={uploading} className="bg-amber-400 text-black font-bold px-6 py-2 rounded-full text-xs uppercase tracking-wider disabled:opacity-50">
-                {uploading ? 'Uploading & Saving...' : 'Save Perfume'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PerfumeCard({ perfume, isAdmin, onUpdate }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [shopee, setShopee] = useState(perfume.link_shopee || '');
-  const [tokopedia, setTokopedia] = useState(perfume.link_tokopedia || '');
-  const [tiktokShop, setTiktokShop] = useState(perfume.link_tiktok_shop || '');
-  const [yt, setYt] = useState(perfume.video_youtube || '');
-  const [tt, setTt] = useState(perfume.video_tiktok || '');
-
-  const saveChanges = async () => {
-    const { error } = await supabase.from('perfumes').update({
-      link_shopee: shopee,
-      link_tokopedia: tokopedia,
-      link_tiktok_shop: tiktokShop,
-      video_youtube: yt,
-      video_tiktok: tt
-    }).eq('id', perfume.id);
-
-    if (error) alert(error.message);
-    else {
-      setIsEditing(false);
-      onUpdate();
-    }
-  };
-
-  return (
-    <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 flex flex-col justify-between relative shadow-2xl hover:border-amber-400/20 transition group">
-      {isAdmin && (
-        <button onClick={() => setIsEditing(!isEditing)} className="absolute top-4 right-4 text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full z-10">
-          {isEditing ? 'Cancel' : '✏️ Edit Links'}
-        </button>
-      )}
-
-      <div>
-        <div className="flex gap-3 h-52 bg-[#1A1A1A] p-4 rounded-xl mb-5 justify-center items-center relative overflow-hidden">
-          <img src={perfume.bottle_image_url} alt={perfume.name} className="h-full object-contain max-w-[50%] group-hover:scale-105 transition duration-500" />
-          {perfume.box_image_url && <img src={perfume.box_image_url} alt="Box" className="h-full object-contain max-w-[50%] group-hover:scale-105 transition duration-500" />}
-        </div>
-
-        <h3 className="font-serif text-xl text-white mb-1">{perfume.name}</h3>
-        <p className="text-xs text-zinc-500 mb-3">{perfume.brand} • Released {perfume.release_year}</p>
-
-        {perfume.is_dupe && (
-          <div className="bg-amber-400/10 border border-amber-400/20 text-amber-300 text-[11px] px-3 py-1 rounded-full mb-4 inline-block">
-            🔍 Dupe of: <span className="font-semibold">{perfume.dupe_of}</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat( auto-fit, minmax(120px, 1fr) )', gap: '10px', marginBottom: '30px' }}>
+            <div style={styles.scoreBox}>Scent: <strong>{selectedPerfume.scent_rating}★</strong></div>
+            <div style={styles.scoreBox}>Perf: <strong>{selectedPerfume.perf_rating}★</strong></div>
+            <div style={styles.scoreBox}>Price: <strong>{selectedPerfume.price_rating}★</strong></div>
+            <div style={styles.scoreBox}>Pres: <strong>{selectedPerfume.pres_rating}★</strong></div>
+            <div style={{ ...styles.scoreBox, border: '1px solid #d4af37', color: '#d4af37' }}>Overall: <strong>{selectedPerfume.overall_rating}★</strong></div>
           </div>
-        )}
 
-        <div className="space-y-1.5 text-xs bg-[#1A1A1A] p-4 rounded-xl mb-5 border border-white/5 text-zinc-300">
-          <p><span className="text-amber-400 font-semibold">Top:</span> {perfume.notes?.top?.join(', ')}</p>
-          <p><span className="text-amber-400 font-semibold">Middle:</span> {perfume.notes?.middle?.join(', ')}</p>
-          <p><span className="text-amber-400 font-semibold">Base:</span> {perfume.notes?.base?.join(', ')}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-xs mb-3 text-zinc-300">
-          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Scent: <span className="font-bold text-amber-400">{perfume.rating_scent}★</span></div>
-          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Perf: <span className="font-bold text-amber-400">{perfume.rating_performance}★</span></div>
-          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Price: <span className="font-bold text-amber-400">{perfume.rating_price}★</span></div>
-          <div className="bg-[#1A1A1A] p-2.5 rounded-lg border border-white/5">Pres: <span className="font-bold text-amber-400">{perfume.rating_presentation}★</span></div>
-        </div>
-        <div className="bg-amber-400/10 border border-amber-400/30 p-2.5 rounded-xl text-center font-bold text-amber-400 text-sm mb-5">
-          Overall: {perfume.rating_overall} / 5.0 ★
-        </div>
-      </div>
-
-      {isEditing ? (
-        <div className="bg-[#1A1A1A] p-4 rounded-xl space-y-2 text-xs border border-amber-400/30">
-          <input type="text" placeholder="Shopee URL" value={shopee} onChange={e => setShopee(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
-          <input type="text" placeholder="Tokopedia URL" value={tokopedia} onChange={e => setTokopedia(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
-          <input type="text" placeholder="TikTok Shop URL" value={tiktokShop} onChange={e => setTiktokShop(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
-          <input type="text" placeholder="YouTube Review URL" value={yt} onChange={e => setYt(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
-          <input type="text" placeholder="TikTok Review URL" value={tt} onChange={e => setTt(e.target.value)} className="w-full bg-[#121212] p-2 rounded-lg border border-white/10 text-white" />
-          <button onClick={saveChanges} className="w-full bg-amber-400 text-black font-bold py-2 rounded-lg mt-2 uppercase tracking-wider text-[11px]">Save Changes</button>
+          <div style={{ display: 'flex', gap: '15px' }}>
+            {selectedPerfume.shopee_link && <a href={selectedPerfume.shopee_link} target="_blank" rel="noreferrer" style={styles.buyBtn}>Buy on Shopee</a>}
+            {selectedPerfume.tokopedia_link && <a href={selectedPerfume.tokopedia_link} target="_blank" rel="noreferrer" style={{ ...styles.buyBtn, backgroundColor: '#03ac0e' }}>Buy on Tokopedia</a>}
+          </div>
         </div>
       ) : (
-        <div className="space-y-3 pt-3 border-t border-white/5 text-xs">
-          <div className="flex flex-wrap gap-2">
-            {perfume.link_shopee && <a href={perfume.link_shopee} target="_blank" rel="noreferrer" className="bg-amber-400 text-black font-bold px-3 py-1 rounded-full text-[11px] hover:bg-amber-300 transition">Shopee</a>}
-            {perfume.link_tokopedia && <a href={perfume.link_tokopedia} target="_blank" rel="noreferrer" className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px]">Tokopedia</a>}
-            {perfume.link_tiktok_shop && <a href={perfume.link_tiktok_shop} target="_blank" rel="noreferrer" className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-[11px]">TikTok Shop</a>}
-            {perfume.link_fragrantica && <a href={perfume.link_fragrantica} target="_blank" rel="noreferrer" className="bg-zinc-900 text-zinc-400 border border-white/10 px-3 py-1 rounded-full text-[11px]">Fragrantica</a>}
+        /* VAULT GRID VIEW */
+        <>
+          {/* SEARCH & FILTERS */}
+          <div style={{ backgroundColor: '#141414', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+            <input type="text" placeholder="Search perfume name or house..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={styles.input} />
+            <input type="text" placeholder="Filter by note (e.g. Vanilla, Amber)..." value={noteFilter} onChange={e => setNoteFilter(e.target.value)} style={{ ...styles.input, marginTop: '10px' }} />
           </div>
-          <div className="flex gap-4 text-[11px] pt-1">
-            {perfume.video_youtube && <a href={perfume.video_youtube} target="_blank" rel="noreferrer" className="text-red-400 hover:underline">▶ YouTube Review</a>}
-            {perfume.video_tiktok && <a href={perfume.video_tiktok} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">🎵 TikTok Review</a>}
+
+          {/* GRID */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '25px' }}>
+            {filteredPerfumes.map(p => (
+              <div 
+                key={p.id} 
+                onClick={() => setSelectedPerfume(p)}
+                style={{ backgroundColor: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: '0.2s' }}
+              >
+                <div style={{ display: 'flex', gap: '10px', height: '200px', marginBottom: '15px' }}>
+                  {p.bottle_url && <img src={p.bottle_url} alt={p.name} style={{ width: '50%', objectFit: 'cover', borderRadius: '6px' }} />}
+                  {p.box_url && <img src={p.box_url} alt="Box" style={{ width: '50%', objectFit: 'cover', borderRadius: '6px' }} />}
+                </div>
+
+                <h3 style={{ fontFamily: 'serif', color: '#fff', margin: '0 0 5px 0' }}>{p.name}</h3>
+                <p style={{ color: '#888', margin: '0 0 10px 0', fontSize: '0.9rem' }}>{p.house} • {p.release_year}</p>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', color: '#d4af37', fontWeight: 'bold' }}>
+                  <span>Overall Rating</span>
+                  <span>{p.overall_rating} / 5.0 ★</span>
+                </div>
+              </div>
+            ))}
           </div>
+        </>
+      )}
+
+      {/* LOGIN MODAL */}
+      {showLoginModal && (
+        <div style={styles.modalOverlay}>
+          <form onSubmit={handleLogin} style={styles.modal}>
+            <h2 style={{ marginTop: 0, color: '#d4af37' }}>Admin Access</h2>
+            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required style={styles.input} />
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required style={{ ...styles.input, marginTop: '10px' }} />
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+              <button type="submit" style={styles.goldBtn}>LOGIN</button>
+              <button type="button" onClick={() => setShowLoginModal(false)} style={styles.darkBtn}>Cancel</button>
+            </div>
+          </form>
         </div>
       )}
+
+      {/* ADD PERFUME MODAL */}
+      {showAddModal && (
+        <div style={styles.modalOverlay}>
+          <form onSubmit={handleAddPerfume} style={{ ...styles.modal, maxWidth: '600px' }}>
+            <h2 style={{ marginTop: 0, color: '#d4af37' }}>Add New Perfume</h2>
+            <input type="text" placeholder="Perfume Name" value={name} onChange={e => setName(e.target.value)} required style={styles.input} />
+            <input type="text" placeholder="Brand / House" value={house} onChange={e => setHouse(e.target.value)} required style={{ ...styles.input, marginTop: '10px' }} />
+            <input type="number" placeholder="Release Year" value={releaseYear} onChange={e => setReleaseYear(e.target.value)} style={{ ...styles.input, marginTop: '10px' }} />
+            
+            <label style={{ display: 'block', margin: '15px 0 5px 0' }}>Top Notes:</label>
+            <input type="text" placeholder="e.g. Bergamot, Coconut" value={topNotes} onChange={e => setTopNotes(e.target.value)} style={styles.input} />
+            <label style={{ display: 'block', margin: '10px 0 5px 0' }}>Middle Notes:</label>
+            <input type="text" placeholder="e.g. Jasmine, Ylang-Ylang" value={middleNotes} onChange={e => setMiddleNotes(e.target.value)} style={styles.input} />
+            <label style={{ display: 'block', margin: '10px 0 5px 0' }}>Base Notes:</label>
+            <input type="text" placeholder="e.g. Vanilla, Amber" value={baseNotes} onChange={e => setBaseNotes(e.target.value)} style={styles.input} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '15px' }}>
+              <div><label>Bottle Image:</label><input type="file" onChange={e => setBottleFile(e.target.files[0])} style={{ marginTop: '5px' }} /></div>
+              <div><label>Box Image:</label><input type="file" onChange={e => setBoxFile(e.target.files[0])} style={{ marginTop: '5px' }} /></div>
+            </div>
+
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+              <button type="submit" disabled={loading} style={styles.goldBtn}>{loading ? 'Uploading...' : 'Save Perfume'}</button>
+              <button type="button" onClick={() => setShowAddModal(false)} style={styles.darkBtn}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }
+
+const styles = {
+  goldBtn: { backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
+  darkBtn: { backgroundColor: '#222', color: '#fff', border: '1px solid #444', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', marginLeft: '10px' },
+  buyBtn: { backgroundColor: '#ee4d2d', color: '#fff', padding: '12px 25px', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold' },
+  input: { width: '100%', padding: '10px', backgroundColor: '#1e1e1e', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box' },
+  scoreBox: { backgroundColor: '#1e1e1e', padding: '10px', borderRadius: '6px', textAlign: 'center' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modal: { backgroundColor: '#141414', border: '1px solid #333', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto' }
+};
