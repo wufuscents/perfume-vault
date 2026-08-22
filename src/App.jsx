@@ -5,7 +5,7 @@ export default function App() {
   const [perfumes, setPerfumes] = useState([]);
   const [dailySpotlight, setDailySpotlight] = useState([]);
   const [user, setUser] = useState(null);
-  const [selectedPerfume, setSelectedPerfume] = useState(null);
+  const [selectedPerfumeId, setSelectedPerfumeId] = useState(null);
   
   // Login & Add Perfume Modals
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -41,6 +41,18 @@ export default function App() {
   const [minOverall, setMinOverall] = useState(0);
 
   useEffect(() => {
+    // Read URL parameters on load
+    const params = new URLSearchParams(window.location.search);
+    const idFromUrl = params.get('id');
+    if (idFromUrl) setSelectedPerfumeId(idFromUrl);
+
+    // Listen to Browser Back/Forward buttons
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      setSelectedPerfumeId(p.get('id'));
+    };
+    window.addEventListener('popstate', handlePopState);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
@@ -50,7 +62,10 @@ export default function App() {
     });
 
     fetchPerfumes();
-    return () => authListener.subscription.unsubscribe();
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   async function fetchPerfumes() {
@@ -68,6 +83,19 @@ export default function App() {
       }
     }
   }
+
+  // Navigate to Dedicated URL
+  const openPerfumePage = (id) => {
+    setSelectedPerfumeId(id);
+    const newUrl = `${window.location.pathname}?id=${id}`;
+    window.history.pushState({ path: newUrl }, '', newUrl);
+  };
+
+  // Back to Main Vault View
+  const closePerfumePage = () => {
+    setSelectedPerfumeId(null);
+    window.history.pushState({ path: window.location.pathname }, '', window.location.pathname);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -137,6 +165,8 @@ export default function App() {
     }
   };
 
+  const activePerfume = perfumes.find(p => String(p.id) === String(selectedPerfumeId));
+
   const filteredPerfumes = perfumes.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
                           p.brand.toLowerCase().includes(search.toLowerCase());
@@ -154,7 +184,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-zinc-100 p-6 md:p-10 font-sans">
       <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={closePerfumePage}>
           <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center font-bold text-black text-sm">PV</div>
           <h1 className="text-2xl font-serif tracking-widest text-white uppercase">Perfume<span className="text-amber-400 font-sans font-bold">Vault</span></h1>
         </div>
@@ -176,137 +206,141 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto space-y-12">
-        <section className="py-6 border-b border-white/5">
-          <p className="text-amber-400 text-xs tracking-widest uppercase mb-2 font-medium">Curated Fragrance Collection</p>
-          <h2 className="text-4xl md:text-5xl font-serif text-white max-w-2xl leading-tight">
-            Sculpting Scents in a Bottle. The Art of Perfumery.
-          </h2>
-        </section>
+        {activePerfume ? (
+          /* DEDICATED INDIVIDUAL PERFUME PAGE VIEW */
+          <div className="bg-[#121212] border border-amber-400/30 rounded-2xl p-6 md:p-10 max-w-4xl mx-auto space-y-8 shadow-2xl">
+            <button onClick={closePerfumePage} className="bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-amber-400/30 text-xs px-5 py-2 rounded-full font-semibold transition">
+              ← Back to Collection
+            </button>
 
-        {dailySpotlight.length > 0 && (
-          <section>
-            <div className="flex justify-between items-end mb-6">
-              <div>
-                <h3 className="text-2xl font-serif text-white">Daily Spotlight</h3>
-                <p className="text-xs text-zinc-500">Curated selections rotated every 24 hours</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {dailySpotlight.map(p => (
-                <div key={p.id} onClick={() => setSelectedPerfume(p)} className="bg-[#121212] p-4 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-400/30 transition cursor-pointer group">
-                  <div className="h-32 bg-[#1A1A1A] rounded-xl p-2 mb-3 flex items-center justify-center">
-                    <img src={p.bottle_image_url} alt={p.name} className="h-full object-contain group-hover:scale-105 transition duration-300" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-xs text-white truncate">{p.name}</h4>
-                    <p className="text-[10px] text-zinc-500">{p.brand}</p>
-                  </div>
-                  <div className="mt-3 flex justify-between items-center text-xs pt-2 border-t border-white/5">
-                    <span className="text-amber-400 font-bold">★ {p.rating_overall}</span>
-                    <span className="text-[10px] bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded-full">Spotlight</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="bg-[#121212] p-6 rounded-2xl border border-white/5 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input 
-              type="text" 
-              placeholder="Search by perfume name or brand..." 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-              className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
-            />
-            <input 
-              type="text" 
-              placeholder="Filter by note (e.g. Amber, Vanilla, Bergamot)..." 
-              value={selectedNote} 
-              onChange={e => setSelectedNote(e.target.value)} 
-              className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-white/5 text-xs">
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Scent: <span className="text-amber-400 font-bold">{minScent}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minScent} onChange={e => setMinScent(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Performance: <span className="text-amber-400 font-bold">{minPerformance}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minPerformance} onChange={e => setMinPerformance(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Price: <span className="text-amber-400 font-bold">{minPrice}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minPrice} onChange={e => setMinPrice(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Presentation: <span className="text-amber-400 font-bold">{minPresentation}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minPresentation} onChange={e => setMinPresentation(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="text-zinc-400 block mb-1">Min Overall: <span className="text-amber-400 font-bold">{minOverall}★</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minOverall} onChange={e => setMinOverall(parseFloat(e.target.value))} className="w-full accent-amber-400" />
-            </div>
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredPerfumes.map(p => (
-            <PerfumeCard key={p.id} perfume={p} isAdmin={!!user} onUpdate={fetchPerfumes} onSelect={() => setSelectedPerfume(p)} />
-          ))}
-        </section>
-      </main>
-
-      {/* INDIVIDUAL PERFUME DETAIL MODAL */}
-      {selectedPerfume && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-[#121212] border border-amber-400/30 rounded-2xl max-w-2xl w-full p-6 md:p-8 space-y-6 relative my-8 shadow-2xl">
-            <button onClick={() => setSelectedPerfume(null)} className="absolute top-4 right-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded-full flex items-center justify-center text-sm transition">✕</button>
-
-            <div className="grid grid-cols-2 gap-4 h-64 bg-[#1A1A1A] p-4 rounded-xl border border-white/5 items-center justify-center">
-              {selectedPerfume.bottle_image_url && <img src={selectedPerfume.bottle_image_url} alt={selectedPerfume.name} className="h-full object-contain mx-auto" />}
-              {selectedPerfume.box_image_url && <img src={selectedPerfume.box_image_url} alt="Box" className="h-full object-contain mx-auto" />}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-80 bg-[#1A1A1A] p-6 rounded-2xl border border-white/5 items-center justify-center">
+              {activePerfume.bottle_image_url && <img src={activePerfume.bottle_image_url} alt={activePerfume.name} className="h-full object-contain mx-auto" />}
+              {activePerfume.box_image_url && <img src={activePerfume.box_image_url} alt="Box" className="h-full object-contain mx-auto" />}
             </div>
 
             <div>
-              <h2 className="text-3xl font-serif text-white">{selectedPerfume.name}</h2>
-              <p className="text-xs text-zinc-400 mt-1">{selectedPerfume.brand} • Released {selectedPerfume.release_year}</p>
+              <h2 className="text-4xl font-serif text-white">{activePerfume.name}</h2>
+              <p className="text-sm text-zinc-400 mt-1">{activePerfume.brand} • Released {activePerfume.release_year}</p>
             </div>
 
-            {selectedPerfume.is_dupe && (
-              <div className="bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs px-4 py-2 rounded-xl">
-                🔍 <strong>Dupe of:</strong> {selectedPerfume.dupe_of}
+            {activePerfume.is_dupe && (
+              <div className="bg-amber-400/10 border border-amber-400/30 text-amber-300 text-sm px-4 py-3 rounded-xl">
+                🔍 <strong>Dupe of:</strong> {activePerfume.dupe_of}
               </div>
             )}
 
-            <div className="bg-[#1A1A1A] p-4 rounded-xl border border-white/5 space-y-2 text-xs">
-              <p><span className="text-amber-400 font-bold">Top Notes:</span> {selectedPerfume.notes?.top?.join(', ') || 'N/A'}</p>
-              <p><span className="text-amber-400 font-bold">Middle Notes:</span> {selectedPerfume.notes?.middle?.join(', ') || 'N/A'}</p>
-              <p><span className="text-amber-400 font-bold">Base Notes:</span> {selectedPerfume.notes?.base?.join(', ') || 'N/A'}</p>
+            <div className="bg-[#1A1A1A] p-6 rounded-2xl border border-white/5 space-y-3 text-sm">
+              <h3 className="text-amber-400 font-serif text-lg mb-2">Fragrance Notes</h3>
+              <p><span className="text-amber-400 font-bold">Top Notes:</span> {activePerfume.notes?.top?.join(', ') || 'N/A'}</p>
+              <p><span className="text-amber-400 font-bold">Middle Notes:</span> {activePerfume.notes?.middle?.join(', ') || 'N/A'}</p>
+              <p><span className="text-amber-400 font-bold">Base Notes:</span> {activePerfume.notes?.base?.join(', ') || 'N/A'}</p>
             </div>
 
-            <div className="grid grid-cols-4 gap-2 text-xs text-center">
-              <div className="bg-[#1A1A1A] p-2.5 rounded-xl border border-white/5"><div className="text-zinc-500">Scent</div><div className="font-bold text-amber-400">{selectedPerfume.rating_scent}★</div></div>
-              <div className="bg-[#1A1A1A] p-2.5 rounded-xl border border-white/5"><div className="text-zinc-500">Perf</div><div className="font-bold text-amber-400">{selectedPerfume.rating_performance}★</div></div>
-              <div className="bg-[#1A1A1A] p-2.5 rounded-xl border border-white/5"><div className="text-zinc-500">Price</div><div className="font-bold text-amber-400">{selectedPerfume.rating_price}★</div></div>
-              <div className="bg-[#1A1A1A] p-2.5 rounded-xl border border-white/5"><div className="text-zinc-500">Pres</div><div className="font-bold text-amber-400">{selectedPerfume.rating_presentation}★</div></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-xs">
+              <div className="bg-[#1A1A1A] p-4 rounded-xl border border-white/5"><div className="text-zinc-500 mb-1">Scent</div><div className="font-bold text-amber-400 text-lg">{activePerfume.rating_scent}★</div></div>
+              <div className="bg-[#1A1A1A] p-4 rounded-xl border border-white/5"><div className="text-zinc-500 mb-1">Performance</div><div className="font-bold text-amber-400 text-lg">{activePerfume.rating_performance}★</div></div>
+              <div className="bg-[#1A1A1A] p-4 rounded-xl border border-white/5"><div className="text-zinc-500 mb-1">Price Value</div><div className="font-bold text-amber-400 text-lg">{activePerfume.rating_price}★</div></div>
+              <div className="bg-[#1A1A1A] p-4 rounded-xl border border-white/5"><div className="text-zinc-500 mb-1">Presentation</div><div className="font-bold text-amber-400 text-lg">{activePerfume.rating_presentation}★</div></div>
             </div>
 
-            <div className="bg-amber-400/10 border border-amber-400/30 p-3 rounded-xl text-center font-bold text-amber-400 text-base">
-              Overall Rating: {selectedPerfume.rating_overall} / 5.0 ★
+            <div className="bg-amber-400/10 border border-amber-400/30 p-4 rounded-xl text-center font-bold text-amber-400 text-xl">
+              Overall Score: {activePerfume.rating_overall} / 5.0 ★
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              {selectedPerfume.link_shopee && <a href={selectedPerfume.link_shopee} target="_blank" rel="noreferrer" className="bg-amber-400 text-black font-bold px-5 py-2 rounded-full text-xs hover:bg-amber-300 transition">Shopee</a>}
-              {selectedPerfume.link_tokopedia && <a href={selectedPerfume.link_tokopedia} target="_blank" rel="noreferrer" className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-5 py-2 rounded-full text-xs">Tokopedia</a>}
-              {selectedPerfume.link_tiktok_shop && <a href={selectedPerfume.link_tiktok_shop} target="_blank" rel="noreferrer" className="bg-zinc-800 text-zinc-200 px-5 py-2 rounded-full text-xs">TikTok Shop</a>}
+              {activePerfume.link_shopee && <a href={activePerfume.link_shopee} target="_blank" rel="noreferrer" className="bg-amber-400 text-black font-bold px-6 py-2.5 rounded-full text-xs hover:bg-amber-300 transition">Buy on Shopee</a>}
+              {activePerfume.link_tokopedia && <a href={activePerfume.link_tokopedia} target="_blank" rel="noreferrer" className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-6 py-2.5 rounded-full text-xs">Buy on Tokopedia</a>}
+              {activePerfume.link_tiktok_shop && <a href={activePerfume.link_tiktok_shop} target="_blank" rel="noreferrer" className="bg-zinc-800 text-zinc-200 px-6 py-2.5 rounded-full text-xs">Buy on TikTok Shop</a>}
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          /* MAIN COLLECTION GRID VIEW */
+          <>
+            <section className="py-6 border-b border-white/5">
+              <p className="text-amber-400 text-xs tracking-widest uppercase mb-2 font-medium">Curated Fragrance Collection</p>
+              <h2 className="text-4xl md:text-5xl font-serif text-white max-w-2xl leading-tight">
+                Sculpting Scents in a Bottle. The Art of Perfumery.
+              </h2>
+            </section>
+
+            {dailySpotlight.length > 0 && (
+              <section>
+                <div className="flex justify-between items-end mb-6">
+                  <div>
+                    <h3 className="text-2xl font-serif text-white">Daily Spotlight</h3>
+                    <p className="text-xs text-zinc-500">Curated selections rotated every 24 hours</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {dailySpotlight.map(p => (
+                    <div key={p.id} onClick={() => openPerfumePage(p.id)} className="bg-[#121212] p-4 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-400/30 transition cursor-pointer group">
+                      <div className="h-32 bg-[#1A1A1A] rounded-xl p-2 mb-3 flex items-center justify-center">
+                        <img src={p.bottle_image_url} alt={p.name} className="h-full object-contain group-hover:scale-105 transition duration-300" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-xs text-white truncate">{p.name}</h4>
+                        <p className="text-[10px] text-zinc-500">{p.brand}</p>
+                      </div>
+                      <div className="mt-3 flex justify-between items-center text-xs pt-2 border-t border-white/5">
+                        <span className="text-amber-400 font-bold">★ {p.rating_overall}</span>
+                        <span className="text-[10px] bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded-full">Spotlight</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="bg-[#121212] p-6 rounded-2xl border border-white/5 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input 
+                  type="text" 
+                  placeholder="Search by perfume name or brand..." 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)} 
+                  className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Filter by note (e.g. Amber, Vanilla, Bergamot)..." 
+                  value={selectedNote} 
+                  onChange={e => setSelectedNote(e.target.value)} 
+                  className="bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-white/5 text-xs">
+                <div>
+                  <label className="text-zinc-400 block mb-1">Min Scent: <span className="text-amber-400 font-bold">{minScent}★</span></label>
+                  <input type="range" min="0" max="5" step="0.5" value={minScent} onChange={e => setMinScent(parseFloat(e.target.value))} className="w-full accent-amber-400" />
+                </div>
+                <div>
+                  <label className="text-zinc-400 block mb-1">Min Performance: <span className="text-amber-400 font-bold">{minPerformance}★</span></label>
+                  <input type="range" min="0" max="5" step="0.5" value={minPerformance} onChange={e => setMinPerformance(parseFloat(e.target.value))} className="w-full accent-amber-400" />
+                </div>
+                <div>
+                  <label className="text-zinc-400 block mb-1">Min Price: <span className="text-amber-400 font-bold">{minPrice}★</span></label>
+                  <input type="range" min="0" max="5" step="0.5" value={minPrice} onChange={e => setMinPrice(parseFloat(e.target.value))} className="w-full accent-amber-400" />
+                </div>
+                <div>
+                  <label className="text-zinc-400 block mb-1">Min Presentation: <span className="text-amber-400 font-bold">{minPresentation}★</span></label>
+                  <input type="range" min="0" max="5" step="0.5" value={minPresentation} onChange={e => setMinPresentation(parseFloat(e.target.value))} className="w-full accent-amber-400" />
+                </div>
+                <div>
+                  <label className="text-zinc-400 block mb-1">Min Overall: <span className="text-amber-400 font-bold">{minOverall}★</span></label>
+                  <input type="range" min="0" max="5" step="0.5" value={minOverall} onChange={e => setMinOverall(parseFloat(e.target.value))} className="w-full accent-amber-400" />
+                </div>
+              </div>
+            </section>
+
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredPerfumes.map(p => (
+                <PerfumeCard key={p.id} perfume={p} isAdmin={!!user} onUpdate={fetchPerfumes} onSelect={() => openPerfumePage(p.id)} />
+              ))}
+            </section>
+          </>
+        )}
+      </main>
 
       {showLoginModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
